@@ -1,17 +1,23 @@
+// client/constants.js
+
 const CONFIG = {
   // Configuración de la física
   GRAVITY: 0.35,
   JUMP_POWER: -8,
   PLAYER_SPEED: 2.2,
   
-  // Dimensiones del jugador
-  PLAYER_WIDTH: 28,
-  PLAYER_HEIGHT: 36,
+  PLAYER_WIDTH: 32,
+  PLAYER_HEIGHT: 32,
   PLAYER_COLOR: '#ff0066',
 
   // Colores
   PLATFORM_COLOR: '#6b3e00',
   OTHER_PLAYER_COLOR: '#00aaff'
+};
+
+
+const ASSETS = {
+  PLAYER: '/assets/character_pink.png' 
 };
 
 // Plataformas (x, y, w, h)

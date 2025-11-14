@@ -1,16 +1,20 @@
-// Asegúrate de que constants.js se cargue antes que este archivo.
 
-// Inicialización
+
+// Inicialización de Socket.io
 const socket = io();
+
+// Inicialización de Canvas
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 
+// Manejo de entrada
 const keys = {};
 window.addEventListener('keydown', e => { keys[e.key] = true; });
 window.addEventListener('keyup', e => { keys[e.key] = false; });
 
+// Variables de juego
 const otherPlayers = {};
-// Jugador local, usando las constantes
+// Jugador local, usando las constantes de CONFIG
 const player = { 
     x: 100, y: 100, 
     w: CONFIG.PLAYER_WIDTH, 
@@ -21,11 +25,35 @@ const player = {
     onGround: false 
 };
 
-// --- Funciones del Juego ---
+// 🖼️ NUEVO: Lógica de carga de assets
+let playerSprite = new Image(); 
+let assetsLoaded = false;
 
+function loadAssets() {
+  return new Promise((resolve) => {
+    playerSprite.onload = () => {
+      console.log('Player sprite loaded!');
+      assetsLoaded = true;
+      resolve();
+    };
+    // ASSETS.PLAYER se define en el archivo constants.js
+    playerSprite.src = ASSETS.PLAYER; 
+    
+    // Manejo básico de error de carga
+    playerSprite.onerror = () => {
+        console.error('Failed to load player sprite from:', ASSETS.PLAYER);
+        assetsLoaded = false; // Permite que el juego inicie con el color de respaldo
+        resolve(); 
+    };
+  });
+}
+
+// --- Funciones del Juego (Actualización) ---
+
+// Basado en el código original: Basic AABB collision for platforms
 function resolveCollisions(p) {
   p.onGround = false;
-  for (const plat of PLATFORMS) {
+  for (const plat of PLATFORMS) { // PLATFORMS viene de constants.js
     if (p.x < plat.x + plat.w &&
         p.x + p.w > plat.x &&
         p.y < plat.y + plat.h &&
@@ -60,30 +88,27 @@ function handleInput() {
   if (keys['a'] || keys['ArrowLeft']) player.vx = -player.speed;
   else if (keys['d'] || keys['ArrowRight']) player.vx = player.speed;
 
+  // Usa 'w', 'ArrowUp' o 'espacio' para saltar
   if ((keys['w'] || keys['ArrowUp'] || keys[' ']) && player.onGround) {
-    player.vy = CONFIG.JUMP_POWER;
+    player.vy = CONFIG.JUMP_POWER; // Usa constante
     player.onGround = false;
   }
 }
 
 function updatePhysics() {
-  // Aplicar gravedad
-  player.vy += CONFIG.GRAVITY;
-
-  // Aplicar movimiento
+  // Aplicar física
+  player.vy += CONFIG.GRAVITY; // Usa constante
   player.x += player.vx;
   player.y += player.vy;
 
   // Límites del mundo
   if (player.x < 0) player.x = 0;
   if (player.x + player.w > canvas.width) player.x = canvas.width - player.w;
-  // Si cae por debajo, lo reinicia en una posición
   if (player.y > canvas.height) { player.y = 100; player.vy = 0; }
 
-  // Resolver colisiones con plataformas
   resolveCollisions(player);
 
-  // Enviar posición al servidor para sincronización
+  // Enviar posición al servidor
   socket.emit('playerMovement', {
     x: Math.round(player.x),
     y: Math.round(player.y),
@@ -93,11 +118,11 @@ function updatePhysics() {
 }
 
 function draw() {
-  // Limpiar el lienzo
+  // Fondo
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   // Dibujar plataformas
-  ctx.fillStyle = CONFIG.PLATFORM_COLOR;
+  ctx.fillStyle = CONFIG.PLATFORM_COLOR; // Usa constante
   for (const plat of PLATFORMS) {
     ctx.fillRect(plat.x, plat.y, plat.w, plat.h);
   }
@@ -105,8 +130,14 @@ function draw() {
   // Dibujar otros jugadores
   for (const id in otherPlayers) {
     const p = otherPlayers[id];
-    ctx.fillStyle = p.color || CONFIG.OTHER_PLAYER_COLOR;
-    ctx.fillRect(p.x, p.y, player.w, player.h);
+    ctx.fillStyle = p.color || CONFIG.OTHER_PLAYER_COLOR; // Usa constante
+    
+    // 🖼️ DIBUJO DE OTROS JUGADORES (con respaldo al sprite)
+    if (assetsLoaded) {
+        ctx.drawImage(playerSprite, p.x, p.y, player.w, player.h); 
+    } else {
+        ctx.fillRect(p.x, p.y, player.w, player.h);
+    }
     
     // Dibujar nombre
     ctx.fillStyle = '#000';
@@ -114,10 +145,15 @@ function draw() {
     ctx.fillText(p.name || id.slice(0, 4), p.x, p.y - 6);
   }
 
-  // Dibujar jugador local
-  ctx.fillStyle = player.color;
-  ctx.fillRect(player.x, player.y, player.w, player.h);
-  
+  // 🖼️ DIBUJAR JUGADOR LOCAL
+  if (assetsLoaded) {
+    ctx.drawImage(playerSprite, player.x, player.y, player.w, player.h);
+  } else {
+    // Dibujo de respaldo si el sprite aún no carga
+    ctx.fillStyle = player.color;
+    ctx.fillRect(player.x, player.y, player.w, player.h);
+  }
+
   // Dibujar "You"
   ctx.fillStyle = '#000';
   ctx.font = '12px monospace';
@@ -163,5 +199,10 @@ socket.on('playerDisconnected', (id) => {
   delete otherPlayers[id];
 });
 
-// Iniciar el juego
-loop();
+// 🚀 Iniciar la carga y luego el loop
+async function start() {
+    await loadAssets();
+    loop();
+}
+
+start();
