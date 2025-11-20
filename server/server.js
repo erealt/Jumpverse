@@ -3,6 +3,11 @@ const app = express();
 const http = require('http').createServer(app);
 const io = require('socket.io')(http);
 
+const WORLD = {
+  WIDTH: 960,
+  HEIGHT: 2400
+};
+
 // CORRECCIÓN: Sirve archivos estáticos desde la carpeta 'client'
 app.use(express.static(__dirname + '/../client'));
 
@@ -17,8 +22,8 @@ io.on('connection', (socket) => {
   // 1. Inicializar el jugador
   players[socket.id] = {
     id: socket.id,
-    x: Math.floor(Math.random() * 200) + 50,
-    y: 100,
+    x: Math.floor(Math.random() * (WORLD.WIDTH - 200)) + 100,
+    y: WORLD.HEIGHT - 60 - 32,
     color: '#' + Math.floor(Math.random()*16777215).toString(16),
     name: 'Player_' + socket.id.slice(0,4)
   };

@@ -6,6 +6,10 @@ const socket = io();
 // Inicialización de Canvas
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
+const camera = {
+  x: 0,
+  y: Math.max(0, CONFIG.WORLD_HEIGHT - canvas.height)
+};
 
 // Manejo de entrada
 const keys = {};
@@ -15,18 +19,20 @@ window.addEventListener('keyup', e => { keys[e.key] = false; });
 // Variables de juego
 const otherPlayers = {};
 // Jugador local, usando las constantes de CONFIG
-const player = { 
-    x: 100, y: 100, 
-    w: CONFIG.PLAYER_WIDTH, 
-    h: CONFIG.PLAYER_HEIGHT, 
-    vx: 0, vy: 0, 
-    speed: CONFIG.PLAYER_SPEED, 
-    color: CONFIG.PLAYER_COLOR, 
-    onGround: false 
+const player = {
+  x: canvas.width / 2 - CONFIG.PLAYER_WIDTH / 2,
+  y: CONFIG.WORLD_HEIGHT - CONFIG.PLAYER_HEIGHT - 60,
+  w: CONFIG.PLAYER_WIDTH,
+  h: CONFIG.PLAYER_HEIGHT,
+  vx: 0, vy: 0,
+  speed: CONFIG.PLAYER_SPEED,
+  color: CONFIG.PLAYER_COLOR,
+  onGround: false
 };
 
-// 🖼️ NUEVO: Lógica de carga de assets
+// Lógica de carga de assets
 let playerSprite = new Image(); 
+
 let assetsLoaded = false;
 
 function loadAssets() {
@@ -48,9 +54,7 @@ function loadAssets() {
   });
 }
 
-// --- Funciones del Juego (Actualización) ---
-
-// Basado en el código original: Basic AABB collision for platforms
+// --- Funciones del Juego ---
 function resolveCollisions(p) {
   p.onGround = false;
   for (const plat of PLATFORMS) { // PLATFORMS viene de constants.js
@@ -103,10 +107,16 @@ function updatePhysics() {
 
   // Límites del mundo
   if (player.x < 0) player.x = 0;
-  if (player.x + player.w > canvas.width) player.x = canvas.width - player.w;
-  if (player.y > canvas.height) { player.y = 100; player.vy = 0; }
+  if (player.x + player.w > CONFIG.WORLD_WIDTH) player.x = CONFIG.WORLD_WIDTH - player.w;
+  if (player.y < 0) { player.y = 0; player.vy = 0; }
+  if (player.y + player.h > CONFIG.WORLD_HEIGHT) {
+    player.y = CONFIG.WORLD_HEIGHT - CONFIG.PLAYER_HEIGHT - 60;
+    player.vy = 0;
+    player.onGround = true;
+  }
 
   resolveCollisions(player);
+  updateCamera();
 
   // Enviar posición al servidor
   socket.emit('playerMovement', {
@@ -117,12 +127,43 @@ function updatePhysics() {
   });
 }
 
+function updateCamera() {
+  const targetX = player.x + player.w / 2 - canvas.width / 2;
+  const maxOffsetX = Math.max(0, CONFIG.WORLD_WIDTH - canvas.width);
+  camera.x = Math.min(Math.max(targetX, 0), maxOffsetX);
+
+  const targetY = player.y + player.h / 2 - canvas.height / 2;
+  const maxOffsetY = Math.max(0, CONFIG.WORLD_HEIGHT - canvas.height);
+  camera.y = Math.min(Math.max(targetY, 0), maxOffsetY);
+}
+
+function drawBackground() {
+  const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  gradient.addColorStop(0, CONFIG.BACKGROUND.SKY_TOP);
+  gradient.addColorStop(1, CONFIG.BACKGROUND.SKY_BOTTOM);
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  const layerHeight = 200;
+  const parallaxOffsetY = (camera.y * 0.2) % layerHeight;
+  ctx.fillStyle = CONFIG.BACKGROUND.PARALLAX_COLOR;
+  ctx.globalAlpha = 0.25;
+  for (let y = -layerHeight; y <= canvas.height + layerHeight; y += layerHeight) {
+    const stripeY = y - parallaxOffsetY;
+    ctx.fillRect(0, stripeY, canvas.width, 80);
+  }
+  ctx.globalAlpha = 1;
+}
+
 function draw() {
-  // Fondo
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawBackground();
+
+  ctx.save();
+  ctx.translate(-camera.x, -camera.y);
 
   // Dibujar plataformas
-  ctx.fillStyle = CONFIG.PLATFORM_COLOR; // Usa constante
+  ctx.fillStyle = CONFIG.PLATFORM_COLOR;
   for (const plat of PLATFORMS) {
     ctx.fillRect(plat.x, plat.y, plat.w, plat.h);
   }
@@ -130,34 +171,31 @@ function draw() {
   // Dibujar otros jugadores
   for (const id in otherPlayers) {
     const p = otherPlayers[id];
-    ctx.fillStyle = p.color || CONFIG.OTHER_PLAYER_COLOR; // Usa constante
-    
-    // 🖼️ DIBUJO DE OTROS JUGADORES (con respaldo al sprite)
+    ctx.fillStyle = p.color || CONFIG.OTHER_PLAYER_COLOR;
+
     if (assetsLoaded) {
-        ctx.drawImage(playerSprite, p.x, p.y, player.w, player.h); 
+      ctx.drawImage(playerSprite, p.x, p.y, player.w, player.h);
     } else {
-        ctx.fillRect(p.x, p.y, player.w, player.h);
+      ctx.fillRect(p.x, p.y, player.w, player.h);
     }
-    
-    // Dibujar nombre
+
     ctx.fillStyle = '#000';
     ctx.font = '10px monospace';
     ctx.fillText(p.name || id.slice(0, 4), p.x, p.y - 6);
   }
 
-  // 🖼️ DIBUJAR JUGADOR LOCAL
   if (assetsLoaded) {
     ctx.drawImage(playerSprite, player.x, player.y, player.w, player.h);
   } else {
-    // Dibujo de respaldo si el sprite aún no carga
     ctx.fillStyle = player.color;
     ctx.fillRect(player.x, player.y, player.w, player.h);
   }
 
-  // Dibujar "You"
   ctx.fillStyle = '#000';
   ctx.font = '12px monospace';
   ctx.fillText('You', player.x, player.y - 8);
+
+  ctx.restore();
 }
 
 // --- Bucle principal del juego ---
