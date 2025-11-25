@@ -27,62 +27,165 @@ const player = {
   vx: 0, vy: 0,
   speed: CONFIG.PLAYER_SPEED,
   color: CONFIG.PLAYER_COLOR,
-  onGround: false
+  onGround: false,
+  prevX: canvas.width / 2 - CONFIG.PLAYER_WIDTH / 2,
+  prevY: CONFIG.WORLD_HEIGHT - CONFIG.PLAYER_HEIGHT - 60
 };
 
 // Lógica de carga de assets
-let playerSprite = new Image(); 
-
+let playerSprite = new Image();
+let backgroundImage = null;
+let backgroundPattern = null;
+let backgroundCanvas = null;
+let backgroundCtx = null;
 let assetsLoaded = false;
 
-function loadAssets() {
+function hexToRgb(hex) {
+  if (!hex) return { r: 0, g: 0, b: 0 };
+  let value = hex.replace('#', '').trim();
+  if (value.length === 3) {
+    value = value.split('').map((char) => char + char).join('');
+  }
+  const int = parseInt(value, 16);
+  if (Number.isNaN(int)) return { r: 0, g: 0, b: 0 };
+  return {
+    r: (int >> 16) & 255,
+    g: (int >> 8) & 255,
+    b: int & 255
+  };
+}
+
+function rgbToCss({ r, g, b }) {
+  return `rgb(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)})`;
+}
+
+function lerp(a, b, t) {
+  return a + (b - a) * Math.min(Math.max(t, 0), 1);
+}
+
+function lerpColor(colorA, colorB, t) {
+  return {
+    r: lerp(colorA.r, colorB.r, t),
+    g: lerp(colorA.g, colorB.g, t),
+    b: lerp(colorA.b, colorB.b, t)
+  };
+}
+
+function getColorFromStops(stops = [], t) {
+  if (!stops.length) return 'rgba(0, 0, 0, 0)';
+  const clamped = Math.min(Math.max(t, 0), 1);
+  let previous = stops[0];
+  for (const stop of stops) {
+    if (clamped <= stop.stop) {
+      const span = stop.stop - previous.stop || 1;
+      const localT = (clamped - previous.stop) / span;
+      const color = lerpColor(hexToRgb(previous.color), hexToRgb(stop.color), localT);
+      return rgbToCss(color);
+    }
+    previous = stop;
+  }
+  const lastColor = hexToRgb(stops[stops.length - 1].color);
+  return rgbToCss(lastColor);
+}
+
+function loadImage(src) {
   return new Promise((resolve) => {
-    playerSprite.onload = () => {
-      console.log('Player sprite loaded!');
-      assetsLoaded = true;
-      resolve();
-    };
-    // ASSETS.PLAYER se define en el archivo constants.js
-    playerSprite.src = ASSETS.PLAYER; 
-    
-    // Manejo básico de error de carga
-    playerSprite.onerror = () => {
-        console.error('Failed to load player sprite from:', ASSETS.PLAYER);
-        assetsLoaded = false; // Permite que el juego inicie con el color de respaldo
-        resolve(); 
-    };
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = src;
   });
+}
+
+async function loadAssets() {
+  const [playerImg, bgImg] = await Promise.all([
+    loadImage(ASSETS.PLAYER),
+    loadImage(ASSETS.BACKGROUND)
+  ]);
+
+  if (playerImg) {
+    playerSprite = playerImg;
+    assetsLoaded = true;
+  } else {
+    assetsLoaded = false;
+  }
+
+  if (bgImg) {
+    const scale = BACKGROUND_SETTINGS?.SCALE || 1;
+    const scaledWidth = Math.max(1, Math.floor(bgImg.width * scale));
+    const scaledHeight = Math.max(1, Math.floor(bgImg.height * scale));
+
+    backgroundCanvas = document.createElement('canvas');
+    backgroundCanvas.width = scaledWidth;
+    backgroundCanvas.height = scaledHeight;
+    backgroundCtx = backgroundCanvas.getContext('2d');
+    backgroundCtx.drawImage(bgImg, 0, 0, scaledWidth, scaledHeight);
+
+    backgroundImage = bgImg;
+    backgroundPattern = ctx.createPattern(backgroundCanvas, 'repeat');
+  } else {
+    backgroundImage = null;
+    backgroundPattern = null;
+    backgroundCanvas = null;
+    backgroundCtx = null;
+  }
 }
 
 // --- Funciones del Juego ---
 function resolveCollisions(p) {
   p.onGround = false;
-  for (const plat of PLATFORMS) { // PLATFORMS viene de constants.js
-    if (p.x < plat.x + plat.w &&
-        p.x + p.w > plat.x &&
-        p.y < plat.y + plat.h &&
-        p.y + p.h > plat.y) {
-      
-      // Colisión por arriba (aterrizaje)
-      if (p.vy > 0 && p.y + p.h - p.vy <= plat.y + 2) {
-        p.y = plat.y - p.h;
-        p.vy = 0;
-        p.onGround = true;
-      } 
-      // Colisión por abajo (cabeza)
-      else if (p.vy < 0 && p.y >= plat.y + plat.h - 2) {
-        p.y = plat.y + plat.h;
-        p.vy = 0;
-      } 
-      // Colisión horizontal
-      else {
-        if (p.x + p.w/2 < plat.x + plat.w/2) {
-          p.x = plat.x - p.w - 0.1;
-        } else {
-          p.x = plat.x + plat.w + 0.1;
-        }
-        p.vx = 0;
-      }
+  // previous bounds
+  const prev = { x: p.prevX, y: p.prevY, w: p.w, h: p.h };
+
+  for (const plat of PLATFORMS) {
+    const collided = p.x < plat.x + plat.w && p.x + p.w > plat.x && p.y < plat.y + plat.h && p.y + p.h > plat.y;
+    if (!collided) continue;
+
+    const prevBottom = prev.y + prev.h;
+    const prevTop = prev.y;
+    const prevRight = prev.x + prev.w;
+    const prevLeft = prev.x;
+
+    const platTop = plat.y;
+    const platBottom = plat.y + plat.h;
+
+    // Land on platform: previous bottom was above platform top
+    if (prevBottom <= platTop) {
+      p.y = platTop - p.h;
+      p.vy = 0;
+      p.onGround = true;
+      continue;
+    }
+
+    // Hit head on platform: previous top was below platform bottom
+    if (prevTop >= platBottom) {
+      p.y = platBottom;
+      p.vy = 0;
+      continue;
+    }
+
+    // Horizontal collision: determine side based on previous horizontal position
+    if (prevRight <= plat.x) {
+      // collided into platform from left
+      p.x = plat.x - p.w - 0.1;
+      p.vx = 0;
+      continue;
+    }
+    if (prevLeft >= plat.x + plat.w) {
+      // collided into platform from right
+      p.x = plat.x + plat.w + 0.1;
+      p.vx = 0;
+      continue;
+    }
+
+    // Fallback: push the player up if still overlapping
+    if (p.vy >= 0) {
+      p.y = platTop - p.h;
+      p.vy = 0;
+      p.onGround = true;
+    } else {
+      p.y = platBottom;
+      p.vy = 0;
     }
   }
 }
@@ -101,6 +204,9 @@ function handleInput() {
 
 function updatePhysics() {
   // Aplicar física
+  // store previous position for robust collision resolution
+  player.prevX = player.x;
+  player.prevY = player.y;
   player.vy += CONFIG.GRAVITY; // Usa constante
   player.x += player.vx;
   player.y += player.vy;
@@ -138,21 +244,45 @@ function updateCamera() {
 }
 
 function drawBackground() {
+  const maxOffsetY = Math.max(0, CONFIG.WORLD_HEIGHT - canvas.height);
+  const progress = maxOffsetY === 0 ? 0 : camera.y / maxOffsetY;
+  const easedProgress = Math.pow(progress, 1.5);
+  const overlayColor = getColorFromStops(BACKGROUND_SETTINGS?.COLOR_STOPS, progress);
+  const overlayAlpha = BACKGROUND_SETTINGS?.OVERLAY_ALPHA ?? 0.35;
+
+  if (backgroundPattern && backgroundCanvas) {
+    ctx.save();
+    const tileWidth = backgroundCanvas.width;
+    const tileHeight = backgroundCanvas.height;
+    const offsetX = -(camera.x % tileWidth);
+    const offsetY = -(camera.y % tileHeight);
+    ctx.translate(offsetX, offsetY);
+    ctx.fillStyle = backgroundPattern;
+    ctx.fillRect(
+      -tileWidth,
+      -tileHeight,
+      canvas.width + tileWidth * 2,
+      canvas.height + tileHeight * 2
+    );
+    ctx.restore();
+
+    if (overlayAlpha > 0) {
+      ctx.save();
+      ctx.globalAlpha = overlayAlpha;
+      ctx.fillStyle = overlayColor;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.restore();
+    }
+    return;
+  }
+
   const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-  gradient.addColorStop(0, CONFIG.BACKGROUND.SKY_TOP);
-  gradient.addColorStop(1, CONFIG.BACKGROUND.SKY_BOTTOM);
+  const topColor = getColorFromStops(BACKGROUND_SETTINGS?.COLOR_STOPS, Math.max(easedProgress - 0.15, 0));
+  const bottomColor = getColorFromStops(BACKGROUND_SETTINGS?.COLOR_STOPS, Math.min(easedProgress + 0.15, 1));
+  gradient.addColorStop(0, topColor || CONFIG.BACKGROUND.SKY_TOP);
+  gradient.addColorStop(1, bottomColor || CONFIG.BACKGROUND.SKY_BOTTOM);
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  const layerHeight = 200;
-  const parallaxOffsetY = (camera.y * 0.2) % layerHeight;
-  ctx.fillStyle = CONFIG.BACKGROUND.PARALLAX_COLOR;
-  ctx.globalAlpha = 0.25;
-  for (let y = -layerHeight; y <= canvas.height + layerHeight; y += layerHeight) {
-    const stripeY = y - parallaxOffsetY;
-    ctx.fillRect(0, stripeY, canvas.width, 80);
-  }
-  ctx.globalAlpha = 1;
 }
 
 function draw() {
