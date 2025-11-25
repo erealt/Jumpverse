@@ -14,6 +14,7 @@ const CONFIG = {
   },
   PLAYER_WIDTH: 32,
   PLAYER_HEIGHT: 32,
+  PLAYER_SCALE: 1.4,
   PLAYER_COLOR: '#ff0066',
 
   // Colores

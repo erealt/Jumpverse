@@ -5,10 +5,62 @@
     <style>
         body { margin: 0; overflow: hidden; background-color: black; }
         canvas { display: block; margin: auto; background-color: #333; }
+        /* Selection overlay */
+        #menuOverlay {
+            position: absolute;
+            left: 0; right: 0; top: 0; bottom: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0,0,0,0.6);
+            z-index: 30;
+            color: #fff;
+            font-family: sans-serif;
+        }
+        #menu {
+            background: #222;
+            padding: 20px;
+            border-radius: 8px;
+            width: 520px;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.6);
+        }
+        .choice { display: inline-block; width: 140px; margin: 8px; text-align: center; cursor: pointer; }
+        .choice img { width: 96px; height: 96px; display: block; margin: 0 auto 6px; border-radius: 8px; }
+        .choice.selected { outline: 3px solid #ffd166; border-radius: 8px; }
+        #playBtn { margin-top: 12px; padding: 8px 16px; background:#06d6a0; color:#012; border:none; border-radius:6px; cursor:pointer; font-weight:bold; }
     </style>
 </head>
 <body>
     <canvas id="game" width="960" height="540"></canvas>
+
+        <div id="menuOverlay">
+            <div id="menu">
+                <h2>Selecciona tu personaje</h2>
+                <div id="choices">
+                    <div class="choice" data-type="sprite" data-src="/assets/character_pink.png">
+                        <img src="/assets/character_pink.png" alt="Pink">
+                        <div>Pink</div>
+                    </div>
+                    <div class="choice" data-type="sprite" data-src="/assets/character_green.png">
+                        <img src="/assets/character_green.png" alt="Green">
+                        <div>Green</div>
+                    </div>
+                    <div class="choice" data-type="sprite" data-src="/assets/character_beige.png">
+                        <img src="/assets/character_beige.png" alt="Beige">
+                        <div>Beige</div>
+                    </div>
+                    <div class="choice" data-type="sprite" data-src="/assets/character_purple.png">
+                        <img src="/assets/character_purple.png" alt="Purple">
+                        <div>Purple</div>
+                    </div>
+                    <div class="choice" data-type="sprite" data-src="/assets/character_yellow.png">
+                        <img src="/assets/character_yellow.png" alt="Yellow">
+                        <div>Yellow</div>
+                    </div>
+                </div>
+                <div style="text-align:right;"><button id="playBtn">Jugar</button></div>
+            </div>
+        </div>
 
     <script src="/socket.io/socket.io.js"></script>
     

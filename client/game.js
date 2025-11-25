@@ -98,16 +98,18 @@ function loadImage(src) {
 }
 
 async function loadAssets() {
-  const [playerImg, bgImg] = await Promise.all([
-    loadImage(ASSETS.PLAYER),
-    loadImage(ASSETS.BACKGROUND)
-  ]);
+  // Load background always, player sprite only when ASSETS.PLAYER is set
+  const bgPromise = loadImage(ASSETS.BACKGROUND);
+  const playerPromise = ASSETS.PLAYER ? loadImage(ASSETS.PLAYER) : Promise.resolve(null);
+
+  const [playerImg, bgImg] = await Promise.all([playerPromise, bgPromise]);
 
   if (playerImg) {
     playerSprite = playerImg;
     assetsLoaded = true;
   } else {
-    assetsLoaded = false;
+    // keep assetsLoaded as-is (false if no sprite chosen)
+    assetsLoaded = assetsLoaded && !!playerSprite;
   }
 
   if (bgImg) {
@@ -373,4 +375,52 @@ async function start() {
     loop();
 }
 
-start();
+// Wait for user to select character in the menu before starting
+function applySelectionAndStart(selection) {
+  if (!selection) selection = { type: 'color', color: CONFIG.PLAYER_COLOR };
+
+  // Apply size scale to the player before starting
+  const scale = CONFIG.PLAYER_SCALE || 1;
+  player.w = Math.round(CONFIG.PLAYER_WIDTH * scale);
+  player.h = Math.round(CONFIG.PLAYER_HEIGHT * scale);
+
+  if (selection.type === 'sprite') {
+    // set ASSETS.PLAYER so loadAssets will load the chosen sprite
+    ASSETS.PLAYER = selection.src;
+    // start game loop — loadAssets will pick up ASSETS.PLAYER
+    start();
+  } else if (selection.type === 'color') {
+    // use solid color sprite
+    ASSETS.PLAYER = null; // ensure no sprite is loaded
+    assetsLoaded = false;
+    player.color = selection.color || CONFIG.PLAYER_COLOR;
+    start();
+  }
+}
+
+// Hook menu UI
+document.addEventListener('DOMContentLoaded', () => {
+  const overlay = document.getElementById('menuOverlay');
+  const choices = Array.from(document.querySelectorAll('.choice'));
+  let current = choices[0];
+  current.classList.add('selected');
+
+  choices.forEach(ch => ch.addEventListener('click', () => {
+    if (current) current.classList.remove('selected');
+    current = ch;
+    ch.classList.add('selected');
+  }));
+
+  document.getElementById('playBtn').addEventListener('click', () => {
+    const type = current.getAttribute('data-type');
+    if (type === 'sprite') {
+      const src = current.getAttribute('data-src');
+      overlay.style.display = 'none';
+      applySelectionAndStart({ type: 'sprite', src });
+    } else {
+      const color = current.getAttribute('data-color');
+      overlay.style.display = 'none';
+      applySelectionAndStart({ type: 'color', color });
+    }
+  });
+});
