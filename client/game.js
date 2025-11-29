@@ -31,6 +31,10 @@ const player = {
   prevX: canvas.width / 2 - CONFIG.PLAYER_WIDTH / 2,
   prevY: CONFIG.WORLD_HEIGHT - CONFIG.PLAYER_HEIGHT - 60
 };
+// Player UI state: lives and temporary invulnerability after respawn
+player.lives = 5;
+player.invulnerableUntil = 0;
+player.flashUntil = 0;
 
 // Lógica de carga de assets
 let playerSprite = new Image();
@@ -44,6 +48,8 @@ let audioCtx = null;
 let jumpBuffer = null;
 let jumpGain = null;
 let jumpLoaded = false;
+// Game state
+let gameOver = false;
 
 function hexToRgb(hex) {
   if (!hex) return { r: 0, g: 0, b: 0 };
@@ -202,6 +208,7 @@ function playJump() {
 // --- Funciones del Juego ---
 function resolveCollisions(p) {
   p.onGround = false;
+  p.supportingPlat = null;
   // previous bounds
   const prev = { x: p.prevX, y: p.prevY, w: p.w, h: p.h };
 
@@ -222,6 +229,7 @@ function resolveCollisions(p) {
       p.y = platTop - p.h;
       p.vy = 0;
       p.onGround = true;
+      p.supportingPlat = plat;
       continue;
     }
 
@@ -255,6 +263,14 @@ function resolveCollisions(p) {
       p.y = platBottom;
       p.vy = 0;
     }
+  }
+
+  // If standing on a moving platform, carry the player horizontally
+  if (p.onGround && p.supportingPlat && p.supportingPlat.moving) {
+    p.x += p.supportingPlat.vx;
+    // clamp to world bounds
+    if (p.x < 0) p.x = 0;
+    if (p.x + p.w > CONFIG.WORLD_WIDTH) p.x = CONFIG.WORLD_WIDTH - p.w;
   }
 }
 
@@ -293,6 +309,13 @@ function updatePhysics() {
   resolveCollisions(player);
   updateCamera();
 
+  // Detect falling below the world (very low) as death/fall
+  const FALL_DEATH_Y = CONFIG.WORLD_HEIGHT + 100;
+  if (player.y > FALL_DEATH_Y) {
+    tryLoseLife(0.5);
+    respawnPlayer();
+  }
+
   // Enviar posición al servidor
   socket.emit('playerMovement', {
     x: Math.round(player.x),
@@ -310,6 +333,30 @@ function updateCamera() {
   const targetY = player.y + player.h / 2 - canvas.height / 2;
   const maxOffsetY = Math.max(0, CONFIG.WORLD_HEIGHT - canvas.height);
   camera.y = Math.min(Math.max(targetY, 0), maxOffsetY);
+}
+
+function tryLoseLife(amount = 1) {
+  const now = Date.now();
+  if (player.invulnerableUntil > now) return; // ignore while invulnerable
+  // allow fractional lives (halves)
+  player.lives = Math.max(0, Math.round((player.lives - amount) * 2) / 2);
+  player.invulnerableUntil = now + 1500; // 1.5s invulnerability after losing life
+  player.flashUntil = now + 1200;
+  // Optional: play a sound or show effect here
+  if (player.lives <= 0) {
+    // Game over: pause updates and show overlay
+    gameOver = true;
+    const overlay = document.getElementById('gameOverOverlay');
+    if (overlay) overlay.style.display = 'flex';
+  }
+}
+
+function respawnPlayer() {
+  // Simple respawn at starting location near bottom
+  player.x = canvas.width / 2 - player.w / 2;
+  player.y = CONFIG.WORLD_HEIGHT - player.h - 60;
+  player.vx = 0;
+  player.vy = 0;
 }
 
 function drawBackground() {
@@ -395,14 +442,70 @@ function draw() {
   ctx.fillText('You', player.x, player.y - 8);
 
   ctx.restore();
+
+  // Draw HUD: lives as hearts
+  drawLivesHUD();
+}
+
+function drawLivesHUD() {
+  const heartSize = 18;
+  const padding = 8;
+  const total = 5; // display up to 5 hearts for UI (but player.lives may be <=3)
+  ctx.save();
+  ctx.resetTransform && ctx.resetTransform();
+  ctx.font = `${heartSize}px sans-serif`;
+  for (let i = 0; i < total; i++) {
+    const x = padding + i * (heartSize + 6);
+    const y = padding + heartSize;
+    // draw empty heart as background
+    ctx.fillStyle = '#555';
+    ctx.fillText('♡', x, y);
+
+    const value = Math.max(0, player.lives - i); // how much this heart is filled (0..1+)
+    if (value >= 1) {
+      // full heart
+      ctx.fillStyle = '#e63946';
+      ctx.fillText('❤', x, y);
+    } else if (value >= 0.5) {
+      // half heart: draw filled heart but clipped to half width
+      const metrics = ctx.measureText('❤');
+      const w = metrics.width || heartSize;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(x, y - heartSize, Math.floor(w / 2), heartSize + 4);
+      ctx.clip();
+      ctx.fillStyle = '#e63946';
+      ctx.fillText('❤', x, y);
+      ctx.restore();
+    }
+  }
+  ctx.restore();
 }
 
 // --- Bucle principal del juego ---
 function loop() {
-  handleInput();
-  updatePhysics();
+  if (!gameOver) {
+    // Update moving platforms before physics so collisions use updated positions
+    updatePlatforms();
+    handleInput();
+    updatePhysics();
+  }
   draw();
   requestAnimationFrame(loop);
+}
+
+function updatePlatforms() {
+  for (const plat of PLATFORMS) {
+    if (!plat.moving) continue;
+    plat.x += plat.vx;
+    if (plat.x < plat.minX) {
+      plat.x = plat.minX;
+      plat.vx = -plat.vx;
+    } else if (plat.x > plat.maxX) {
+      plat.x = plat.maxX;
+      plat.vx = -plat.vx;
+    }
+  }
 }
 
 
@@ -502,5 +605,18 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
       applySelectionAndStart(selection);
     }
+  });
+
+  // Restart button for Game Over
+  const restartBtn = document.getElementById('restartBtn');
+  if (restartBtn) restartBtn.addEventListener('click', () => {
+    const overlay = document.getElementById('gameOverOverlay');
+    if (overlay) overlay.style.display = 'none';
+    // reset game state
+    player.lives = 3;
+    player.invulnerableUntil = 0;
+    player.flashUntil = 0;
+    respawnPlayer();
+    gameOver = false;
   });
 });

@@ -25,7 +25,7 @@ const CONFIG = {
 
 const ASSETS = {
   PLAYER: '/assets/character_pink.png',
-  BACKGROUND: '/assets/suelo.jpg'
+  BACKGROUND: '/assets/fondo.jpg'
 };
 // Add jump sound asset
 ASSETS.JUMP = '/assets/salto.ogg';
@@ -78,7 +78,17 @@ const PLATFORMS = (() => {
     const maxX = CONFIG.WORLD_WIDTH - width - safeMargin;
     newX = Math.min(Math.max(newX, minX), maxX);
 
-    platforms.push({ x: Math.round(newX), y: Math.round(currentY), w: width, h: 20 });
+    // Occasionally make this platform a moving platform (but not the ground)
+    const makeMoving = (i % 5 === 2); // roughly some platforms become moving
+    if (makeMoving) {
+      const range = 80 + (i % 3) * 30; // range of motion
+      const minXMov = Math.max(minX, Math.round(newX - range));
+      const maxXMov = Math.min(maxX, Math.round(newX + range));
+      const vx = (i % 2 === 0) ? 0.6 : -0.6;
+      platforms.push({ x: Math.round(newX), y: Math.round(currentY), w: width, h: 20, moving: true, minX: minXMov, maxX: maxXMov, vx });
+    } else {
+      platforms.push({ x: Math.round(newX), y: Math.round(currentY), w: width, h: 20 });
+    }
 
     prevX = newX;
   }

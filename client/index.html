@@ -73,6 +73,15 @@
             </div>
         </div>
 
+        <!-- Game Over overlay -->
+        <div id="gameOverOverlay" style="display:none; position:absolute; left:0;right:0;top:0;bottom:0; align-items:center; justify-content:center; background:rgba(0,0,0,0.9); z-index:60;">
+            <div style="text-align:center; color:#fff; font-family:sans-serif; width:100%; height:100%; display:flex; align-items:center; justify-content:center; flex-direction:column;">
+                <div style="font-size:48px; font-weight:bold; margin-bottom:12px;">Game Over</div>
+                <div style="font-size:20px; margin-bottom:18px;">Has perdido todas tus vidas.</div>
+                <button id="restartBtn" style="padding:12px 20px; font-size:16px; border-radius:8px; background:#06d6a0; color:#012; border:none; cursor:pointer;">Reiniciar</button>
+            </div>
+        </div>
+
     <script src="/socket.io/socket.io.js"></script>
     
     <script src="/constants.js"></script>
