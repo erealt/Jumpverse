@@ -27,6 +27,8 @@ const ASSETS = {
   PLAYER: '/assets/character_pink.png',
   BACKGROUND: '/assets/suelo.jpg'
 };
+// Add jump sound asset
+ASSETS.JUMP = '/assets/salto.ogg';
 
 const BACKGROUND_SETTINGS = {
   SCALE: 2.2,
@@ -47,25 +49,31 @@ const PLATFORMS = (() => {
   ];
 
   const STEP_COUNT = 22; // number of small platforms above the ground
-  const VERTICAL_GAP = 68; // px between platforms (should be <= max jump height ~110)
-  const MAX_HORZ_SHIFT = 90; // max horizontal shift per jump (based on speed*airtime ~110)
-  const MIN_WIDTH = 220;
-  const MAX_WIDTH = 280;
+  // Make vertical gaps larger to increase difficulty but keep under max jump (~110px)
+  const VERTICAL_GAP = 96; // base px between platforms
+  const MAX_HORZ_SHIFT = 110; // max horizontal shift per jump (based on speed*airtime ~110)
+  // Narrower platforms for challenge
+  const MIN_WIDTH = 140;
+  const MAX_WIDTH = 220;
 
   // start near center
   let prevX = (CONFIG.WORLD_WIDTH - 260) / 2;
   let currentY = CONFIG.WORLD_HEIGHT - 60;
 
   for (let i = 0; i < STEP_COUNT; i++) {
-    currentY -= VERTICAL_GAP;
+    // Occasionally make a slightly larger vertical gap for variety
+    const extraGap = (i % 5 === 0) ? 8 : 0;
+    currentY -= (VERTICAL_GAP + extraGap);
 
     // alternate left-right shifts but limit them to MAX_HORZ_SHIFT
     const dir = i % 2 === 0 ? -1 : 1;
-    const shift = MAX_HORZ_SHIFT - (i % 3) * 10; // vary shift slightly
+    // vary horizontal shift slightly per step to create tricky jumps
+    const shift = Math.max(24, MAX_HORZ_SHIFT - (i % 4) * 8); // remain <= MAX_HORZ_SHIFT
     let newX = prevX + dir * shift;
 
-    const width = MIN_WIDTH + (i % 3) * 20; // 220, 240, 260 etc
-    const safeMargin = 12;
+    // vary widths, mostly narrow to increase precision required
+    const width = Math.min(MAX_WIDTH, MIN_WIDTH + (i % 4) * 20);
+    const safeMargin = 8;
     const minX = safeMargin;
     const maxX = CONFIG.WORLD_WIDTH - width - safeMargin;
     newX = Math.min(Math.max(newX, minX), maxX);

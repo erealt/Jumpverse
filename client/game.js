@@ -39,6 +39,11 @@ let backgroundPattern = null;
 let backgroundCanvas = null;
 let backgroundCtx = null;
 let assetsLoaded = false;
+// Web Audio state
+let audioCtx = null;
+let jumpBuffer = null;
+let jumpGain = null;
+let jumpLoaded = false;
 
 function hexToRgb(hex) {
   if (!hex) return { r: 0, g: 0, b: 0 };
@@ -97,12 +102,35 @@ function loadImage(src) {
   });
 }
 
+async function createAudioContextIfNeeded() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  try { await audioCtx.resume(); } catch (e) { }
+}
+
+async function loadAudioBuffer(url) {
+  if (!url) return null;
+  try {
+    await createAudioContextIfNeeded();
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const ab = await res.arrayBuffer();
+    const buf = await audioCtx.decodeAudioData(ab);
+    return buf;
+  } catch (e) {
+    console.warn('Failed to load audio buffer', e);
+    return null;
+  }
+}
+
 async function loadAssets() {
   // Load background always, player sprite only when ASSETS.PLAYER is set
   const bgPromise = loadImage(ASSETS.BACKGROUND);
   const playerPromise = ASSETS.PLAYER ? loadImage(ASSETS.PLAYER) : Promise.resolve(null);
+  const jumpPromise = ASSETS.JUMP ? loadAudioBuffer(ASSETS.JUMP) : Promise.resolve(null);
 
-  const [playerImg, bgImg] = await Promise.all([playerPromise, bgPromise]);
+  const [playerImg, bgImg, jumpBuf] = await Promise.all([playerPromise, bgPromise, jumpPromise]);
 
   if (playerImg) {
     playerSprite = playerImg;
@@ -130,6 +158,44 @@ async function loadAssets() {
     backgroundPattern = null;
     backgroundCanvas = null;
     backgroundCtx = null;
+  }
+
+  // Handle jump buffer if present
+  if (typeof jumpBuf !== 'undefined') {
+    if (jumpBuf) {
+      jumpBuffer = jumpBuf;
+      jumpLoaded = true;
+      try {
+        if (!jumpGain && audioCtx) {
+          jumpGain = audioCtx.createGain();
+          jumpGain.gain.value = 0.8;
+          jumpGain.connect(audioCtx.destination);
+        }
+      } catch (e) { /* ignore */ }
+    } else {
+      jumpBuffer = null;
+      jumpLoaded = false;
+    }
+  }
+}
+
+function playJump() {
+  try {
+    if (jumpBuffer && audioCtx && jumpGain) {
+      const src = audioCtx.createBufferSource();
+      src.buffer = jumpBuffer;
+      src.connect(jumpGain);
+      src.start(0);
+      return;
+    }
+    // fallback: try HTMLAudio if present
+    if (typeof Audio !== 'undefined' && ASSETS.JUMP) {
+      const a = new Audio(ASSETS.JUMP);
+      a.volume = 0.8;
+      a.play().catch(() => {});
+    }
+  } catch (e) {
+    console.warn('playJump error', e);
   }
 }
 
@@ -199,8 +265,9 @@ function handleInput() {
 
   // Usa 'w', 'ArrowUp' o 'espacio' para saltar
   if ((keys['w'] || keys['ArrowUp'] || keys[' ']) && player.onGround) {
-    player.vy = CONFIG.JUMP_POWER; // Usa constante
+    player.vy = CONFIG.JUMP_POWER; 
     player.onGround = false;
+    try { playJump(); } catch (e) {  }
   }
 }
 
@@ -411,7 +478,9 @@ document.addEventListener('DOMContentLoaded', () => {
     ch.classList.add('selected');
   }));
 
-  document.getElementById('playBtn').addEventListener('click', () => {
+  document.getElementById('playBtn').addEventListener('click', async () => {
+    // Ensure AudioContext can be created/resumed on this user gesture
+    try { await createAudioContextIfNeeded(); } catch (e) { /* ignore */ }
     const type = current.getAttribute('data-type');
     if (type === 'sprite') {
       const src = current.getAttribute('data-src');
