@@ -22,6 +22,9 @@ const CONFIG = {
   OTHER_PLAYER_COLOR: '#00aaff'
 };
 
+// Multiplier to globally speed up moving platforms (1 = original speed)
+CONFIG.PLATFORM_SPEED_MULTIPLIER = 1.4;
+
 
 const ASSETS = {
   PLAYER: '/assets/character_pink.png',
@@ -29,6 +32,8 @@ const ASSETS = {
 };
 // Add jump sound asset
 ASSETS.JUMP = '/assets/salto.ogg';
+// Slime enemy sprite
+ASSETS.SLIME = '/assets/slimeBlock.png';
 
 const BACKGROUND_SETTINGS = {
   SCALE: 2.2,
@@ -95,3 +100,14 @@ const PLATFORMS = (() => {
 
   return platforms;
 })();
+
+// Slime enemies: simple patrolers. Each slime: { x, y, w, h, minX, maxX, vx }
+// Place a few slimes at various heights near platform clusters.
+const SLIMES = [
+  { x: 120, y: CONFIG.WORLD_HEIGHT - 120, w: 28, h: 24, minX: 80, maxX: 360, vx: 0.8 },
+  { x: 520, y: CONFIG.WORLD_HEIGHT - 96 - 96 * 4, w: 28, h: 24, minX: 400, maxX: 700, vx: -0.7 },
+  { x: 200, y: CONFIG.WORLD_HEIGHT - 96 - 96 * 8, w: 28, h: 24, minX: 120, maxX: 340, vx: 0.6 }
+];
+
+// Multiplier for slime patrol speed
+CONFIG.SLIME_SPEED_MULTIPLIER = 1.0;

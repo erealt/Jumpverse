@@ -43,6 +43,8 @@ let backgroundPattern = null;
 let backgroundCanvas = null;
 let backgroundCtx = null;
 let assetsLoaded = false;
+let slimeImage = null;
+let slimeLoaded = false;
 // Web Audio state
 let audioCtx = null;
 let jumpBuffer = null;
@@ -135,8 +137,9 @@ async function loadAssets() {
   const bgPromise = loadImage(ASSETS.BACKGROUND);
   const playerPromise = ASSETS.PLAYER ? loadImage(ASSETS.PLAYER) : Promise.resolve(null);
   const jumpPromise = ASSETS.JUMP ? loadAudioBuffer(ASSETS.JUMP) : Promise.resolve(null);
+  const slimePromise = ASSETS.SLIME ? loadImage(ASSETS.SLIME) : Promise.resolve(null);
 
-  const [playerImg, bgImg, jumpBuf] = await Promise.all([playerPromise, bgPromise, jumpPromise]);
+  const [playerImg, bgImg, jumpBuf, slimeImg] = await Promise.all([playerPromise, bgPromise, jumpPromise, slimePromise]);
 
   if (playerImg) {
     playerSprite = playerImg;
@@ -181,6 +184,17 @@ async function loadAssets() {
     } else {
       jumpBuffer = null;
       jumpLoaded = false;
+    }
+  }
+
+  // handle slime image
+  if (typeof slimeImg !== 'undefined') {
+    if (slimeImg) {
+      slimeImage = slimeImg;
+      slimeLoaded = true;
+    } else {
+      slimeImage = null;
+      slimeLoaded = false;
     }
   }
 }
@@ -414,6 +428,9 @@ function draw() {
     ctx.fillRect(plat.x, plat.y, plat.w, plat.h);
   }
 
+  // Dibujar slimes (enemigos)
+  drawSlimes();
+
   // Dibujar otros jugadores
   for (const id in otherPlayers) {
     const p = otherPlayers[id];
@@ -482,13 +499,29 @@ function drawLivesHUD() {
   ctx.restore();
 }
 
+function drawSlimes() {
+  if (!Array.isArray(SLIMES)) return;
+  for (const s of SLIMES) {
+    if (slimeLoaded && slimeImage) {
+      ctx.drawImage(slimeImage, s.x, s.y, s.w, s.h);
+    } else {
+      ctx.fillStyle = '#29a745';
+      ctx.fillRect(s.x, s.y, s.w, s.h);
+    }
+  }
+}
+
 // --- Bucle principal del juego ---
 function loop() {
   if (!gameOver) {
     // Update moving platforms before physics so collisions use updated positions
     updatePlatforms();
+    // Update slimes' patrol positions
+    updateSlimes();
     handleInput();
     updatePhysics();
+    // After physics, check collisions with slimes
+    checkPlayerSlimeCollisions();
   }
   draw();
   requestAnimationFrame(loop);
@@ -497,7 +530,8 @@ function loop() {
 function updatePlatforms() {
   for (const plat of PLATFORMS) {
     if (!plat.moving) continue;
-    plat.x += plat.vx;
+    const mult = (typeof CONFIG.PLATFORM_SPEED_MULTIPLIER === 'number') ? CONFIG.PLATFORM_SPEED_MULTIPLIER : 1;
+    plat.x += plat.vx * mult;
     if (plat.x < plat.minX) {
       plat.x = plat.minX;
       plat.vx = -plat.vx;
@@ -505,6 +539,38 @@ function updatePlatforms() {
       plat.x = plat.maxX;
       plat.vx = -plat.vx;
     }
+  }
+}
+
+function updateSlimes() {
+  if (!Array.isArray(SLIMES)) return;
+  const mult = (typeof CONFIG.SLIME_SPEED_MULTIPLIER === 'number') ? CONFIG.SLIME_SPEED_MULTIPLIER : 1;
+  for (const s of SLIMES) {
+    s.x += (s.vx || 0) * mult;
+    if (s.x < s.minX) {
+      s.x = s.minX;
+      s.vx = -(s.vx || 0);
+    } else if (s.x > s.maxX) {
+      s.x = s.maxX;
+      s.vx = -(s.vx || 0);
+    }
+  }
+}
+
+function checkPlayerSlimeCollisions() {
+  if (!Array.isArray(SLIMES)) return;
+  for (const s of SLIMES) {
+    const collided = player.x < s.x + s.w && player.x + player.w > s.x && player.y < s.y + s.h && player.y + player.h > s.y;
+    if (!collided) continue;
+    // If player is invulnerable, ignore
+    const now = Date.now();
+    if (player.invulnerableUntil > now) continue;
+    // Damage player and knock back slightly
+    tryLoseLife(1);
+    player.vy = CONFIG.JUMP_POWER / 1.2; // knock upwards a bit
+    // push horizontally away from slime
+    const push = (player.x + player.w / 2) < (s.x + s.w / 2) ? -6 : 6;
+    player.x += push;
   }
 }
 
@@ -521,18 +587,26 @@ socket.on('currentPlayers', (players) => {
       player.x = players[id].x;
       player.y = players[id].y;
       player.color = players[id].color || player.color;
+      // keep local lives at 5 unless server provided a value
+      player.lives = players[id].lives || 5;
     } else {
       otherPlayers[id] = players[id];
+      otherPlayers[id].lives = players[id].lives || 5;
     }
   }
 });
 
 socket.on('newPlayer', (p) => {
   otherPlayers[p.id] = p;
+  otherPlayers[p.id].lives = p.lives || 5;
 });
 
 socket.on('playerMoved', (p) => {
-  if (p.id !== socket.id) otherPlayers[p.id] = p;
+  if (p.id !== socket.id) {
+    otherPlayers[p.id] = p;
+    // preserve lives if present, default to 5
+    otherPlayers[p.id].lives = p.lives || otherPlayers[p.id].lives || 5;
+  }
 });
 
 socket.on('playerDisconnected', (id) => {
@@ -613,7 +687,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const overlay = document.getElementById('gameOverOverlay');
     if (overlay) overlay.style.display = 'none';
     // reset game state
-    player.lives = 3;
+    player.lives = 5;
     player.invulnerableUntil = 0;
     player.flashUntil = 0;
     respawnPlayer();
