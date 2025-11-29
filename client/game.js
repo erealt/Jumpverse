@@ -482,14 +482,25 @@ document.addEventListener('DOMContentLoaded', () => {
     // Ensure AudioContext can be created/resumed on this user gesture
     try { await createAudioContextIfNeeded(); } catch (e) { /* ignore */ }
     const type = current.getAttribute('data-type');
+    let selection;
     if (type === 'sprite') {
       const src = current.getAttribute('data-src');
-      overlay.style.display = 'none';
-      applySelectionAndStart({ type: 'sprite', src });
+      selection = { type: 'sprite', src };
     } else {
       const color = current.getAttribute('data-color');
-      overlay.style.display = 'none';
-      applySelectionAndStart({ type: 'color', color });
+      selection = { type: 'color', color };
+    }
+    // Hide menu and show transition overlay briefly
+    overlay.style.display = 'none';
+    const trans = document.getElementById('transitionOverlay');
+    if (trans) {
+      trans.style.display = 'flex';
+      setTimeout(() => {
+        trans.style.display = 'none';
+        applySelectionAndStart(selection);
+      }, 2500);
+    } else {
+      applySelectionAndStart(selection);
     }
   });
 });
