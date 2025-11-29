@@ -31,7 +31,7 @@
     </style>
 </head>
 <body>
-    <canvas id="game" width="960" height="540"></canvas>
+    <canvas id="game" width="1280" height="720" style="max-width:100%; height:auto;"></canvas>
 
         <div id="menuOverlay">
             <div id="menu">
@@ -59,6 +59,17 @@
                     </div>
                 </div>
                 <div style="text-align:right;"><button id="playBtn">Jugar</button></div>
+            </div>
+        </div>
+
+        <!-- Transition overlay shown briefly after selecting a character -->
+        <div id="transitionOverlay" style="display:none; position:absolute; left:0;right:0;top:0;bottom:0; align-items:center; justify-content:center; background:rgba(0,0,0,0.95); z-index:40;">
+            <div style="text-align:center; color:#fff; font-family:sans-serif; width:100%; height:100%; display:flex; align-items:center; justify-content:center; flex-direction:column;">
+                <img id="transitionImg" src="/assets/transicon%20cohete.gif" alt="transicion" style="max-width:90vw; max-height:90vh; width:auto; height:auto; display:block; margin:0 auto 12px; object-fit:contain;" />
+                <div style="font-size:22px; margin-top:12px; line-height:1.3; max-width:80vw;">
+                    Preparando despegue...<br />
+                    ¡Nos vemos en el Jumpverse!
+                </div>
             </div>
         </div>
 
