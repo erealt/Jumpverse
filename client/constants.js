@@ -36,6 +36,10 @@ ASSETS.JUMP = '/assets/salto.ogg';
 ASSETS.SLIME = '/assets/slimeBlock.png';
 // Star collectible
 ASSETS.STAR = '/assets/star.svg';
+// Star pickup sound
+ASSETS.STAR_SOUND = '/assets/estrella_sonido.ogg';
+// Damage sound when player loses life
+ASSETS.DAMAGE = '/assets/daño.ogg';
 
 const BACKGROUND_SETTINGS = {
   SCALE: 2.2,

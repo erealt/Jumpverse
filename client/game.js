@@ -52,6 +52,12 @@ let audioCtx = null;
 let jumpBuffer = null;
 let jumpGain = null;
 let jumpLoaded = false;
+let starBuffer = null;
+let starGain = null;
+let starLoadedSound = false;
+let damageBuffer = null;
+let damageGain = null;
+let damageLoadedSound = false;
 // Game state
 let gameOver = false;
 
@@ -209,6 +215,44 @@ async function loadAssets() {
     } else {
       starImage = null;
       starLoaded = false;
+    }
+  }
+  // load star sound buffer if present
+  if (ASSETS.STAR_SOUND) {
+    try {
+      const buf = await loadAudioBuffer(ASSETS.STAR_SOUND);
+      if (buf) {
+        starBuffer = buf;
+        starLoadedSound = true;
+        if (!starGain && audioCtx) {
+          starGain = audioCtx.createGain();
+          starGain.gain.value = 0.9;
+          starGain.connect(audioCtx.destination);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load star sound', e);
+      starBuffer = null;
+      starLoadedSound = false;
+    }
+  }
+  // load damage sound buffer if present
+  if (ASSETS.DAMAGE) {
+    try {
+      const buf = await loadAudioBuffer(ASSETS.DAMAGE);
+      if (buf) {
+        damageBuffer = buf;
+        damageLoadedSound = true;
+        if (!damageGain && audioCtx) {
+          damageGain = audioCtx.createGain();
+          damageGain.gain.value = 0.9;
+          damageGain.connect(audioCtx.destination);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load damage sound', e);
+      damageBuffer = null;
+      damageLoadedSound = false;
     }
   }
 }
@@ -371,6 +415,20 @@ function tryLoseLife(amount = 1) {
   player.invulnerableUntil = now + 1500; // 1.5s invulnerability after losing life
   player.flashUntil = now + 1200;
   // Optional: play a sound or show effect here
+  try {
+    if (damageBuffer && audioCtx && damageGain) {
+      const src = audioCtx.createBufferSource();
+      src.buffer = damageBuffer;
+      src.connect(damageGain);
+      src.start(0);
+    } else if (typeof Audio !== 'undefined' && ASSETS.DAMAGE) {
+      const a = new Audio(ASSETS.DAMAGE);
+      a.volume = 0.9;
+      a.play().catch(() => {});
+    }
+  } catch (e) {
+    console.warn('play damage sound error', e);
+  }
   if (player.lives <= 0) {
     // Game over: pause updates and show overlay
     gameOver = true;
@@ -652,7 +710,21 @@ function checkPlayerStarCollisions() {
     const collided = player.x < s.x + s.w && player.x + player.w > s.x && player.y < s.y + s.h && player.y + player.h > s.y;
     if (!collided) continue;
     s.collected = true;
-    // optional: play sound or give points
+    // play star pickup sound
+    try {
+      if (starBuffer && audioCtx && starGain) {
+        const src = audioCtx.createBufferSource();
+        src.buffer = starBuffer;
+        src.connect(starGain);
+        src.start(0);
+      } else if (typeof Audio !== 'undefined' && ASSETS.STAR_SOUND) {
+        const a = new Audio(ASSETS.STAR_SOUND);
+        a.volume = 0.9;
+        a.play().catch(() => {});
+      }
+    } catch (e) {
+      console.warn('play star sound error', e);
+    }
   }
 }
 
