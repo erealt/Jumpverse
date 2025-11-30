@@ -45,6 +45,8 @@ let backgroundCtx = null;
 let assetsLoaded = false;
 let slimeImage = null;
 let slimeLoaded = false;
+let starImage = null;
+let starLoaded = false;
 // Web Audio state
 let audioCtx = null;
 let jumpBuffer = null;
@@ -138,8 +140,9 @@ async function loadAssets() {
   const playerPromise = ASSETS.PLAYER ? loadImage(ASSETS.PLAYER) : Promise.resolve(null);
   const jumpPromise = ASSETS.JUMP ? loadAudioBuffer(ASSETS.JUMP) : Promise.resolve(null);
   const slimePromise = ASSETS.SLIME ? loadImage(ASSETS.SLIME) : Promise.resolve(null);
+  const starPromise = ASSETS.STAR ? loadImage(ASSETS.STAR) : Promise.resolve(null);
 
-  const [playerImg, bgImg, jumpBuf, slimeImg] = await Promise.all([playerPromise, bgPromise, jumpPromise, slimePromise]);
+  const [playerImg, bgImg, jumpBuf, slimeImg, starImg] = await Promise.all([playerPromise, bgPromise, jumpPromise, slimePromise, starPromise]);
 
   if (playerImg) {
     playerSprite = playerImg;
@@ -195,6 +198,17 @@ async function loadAssets() {
     } else {
       slimeImage = null;
       slimeLoaded = false;
+    }
+  }
+
+  // handle star image
+  if (typeof starImg !== 'undefined') {
+    if (starImg) {
+      starImage = starImg;
+      starLoaded = true;
+    } else {
+      starImage = null;
+      starLoaded = false;
     }
   }
 }
@@ -431,6 +445,9 @@ function draw() {
   // Dibujar slimes (enemigos)
   drawSlimes();
 
+  // Dibujar estrellas coleccionables
+  drawStars();
+
   // Dibujar otros jugadores
   for (const id in otherPlayers) {
     const p = otherPlayers[id];
@@ -462,6 +479,8 @@ function draw() {
 
   // Draw HUD: lives as hearts
   drawLivesHUD();
+  // Draw HUD: stars collected
+  drawStarsHUD();
 }
 
 function drawLivesHUD() {
@@ -499,6 +518,49 @@ function drawLivesHUD() {
   ctx.restore();
 }
 
+function drawStarsHUD() {
+  // top-right or top-center display of 10 slots
+  const total = Array.isArray(STARS) ? STARS.length : 10;
+  const size = 22;
+  const padding = 10;
+  const startX = Math.round((canvas.width - (total * (size + 6) - 6)) / 2);
+  const y = padding + size;
+  ctx.save();
+  ctx.resetTransform && ctx.resetTransform();
+  for (let i = 0; i < total; i++) {
+    const x = startX + i * (size + 6);
+    // slot background
+    ctx.fillStyle = '#333';
+    ctx.fillRect(x - 2, y - size, size + 4, size + 4);
+    // if collected, draw filled star
+    const s = STARS[i];
+    if (s && s.collected) {
+      if (starLoaded && starImage) {
+        ctx.drawImage(starImage, x, y - size + 2, size, size);
+      } else {
+        ctx.fillStyle = '#ffd166';
+        ctx.beginPath();
+        const cx = x + size / 2;
+        const cy = y - size / 2;
+        const r = size / 2;
+        ctx.moveTo(cx + r, cy);
+        for (let k = 1; k <= 5; k++) {
+          const a = (k * 2 * Math.PI) / 5;
+          ctx.lineTo(cx + Math.cos(a) * r * 0.5, cy + Math.sin(a) * r * 0.5);
+          const b = ((k + 0.5) * 2 * Math.PI) / 5;
+          ctx.lineTo(cx + Math.cos(b) * r, cy + Math.sin(b) * r);
+        }
+        ctx.fill();
+      }
+    } else {
+      // empty slot outline
+      ctx.strokeStyle = '#777';
+      ctx.strokeRect(x, y - size + 2, size, size);
+    }
+  }
+  ctx.restore();
+}
+
 function drawSlimes() {
   if (!Array.isArray(SLIMES)) return;
   for (const s of SLIMES) {
@@ -518,10 +580,14 @@ function loop() {
     updatePlatforms();
     // Update slimes' patrol positions
     updateSlimes();
+    // Update stars (placeholder)
+    updateStars();
     handleInput();
     updatePhysics();
     // After physics, check collisions with slimes
     checkPlayerSlimeCollisions();
+    // Check star pickups after physics
+    checkPlayerStarCollisions();
   }
   draw();
   requestAnimationFrame(loop);
@@ -571,6 +637,46 @@ function checkPlayerSlimeCollisions() {
     // push horizontally away from slime
     const push = (player.x + player.w / 2) < (s.x + s.w / 2) ? -6 : 6;
     player.x += push;
+  }
+}
+
+// Stars: update and collision
+function updateStars() {
+  // nothing to animate per-frame for now, but function kept for symmetry
+}
+
+function checkPlayerStarCollisions() {
+  if (!Array.isArray(STARS)) return;
+  for (const s of STARS) {
+    if (s.collected) continue;
+    const collided = player.x < s.x + s.w && player.x + player.w > s.x && player.y < s.y + s.h && player.y + player.h > s.y;
+    if (!collided) continue;
+    s.collected = true;
+    // optional: play sound or give points
+  }
+}
+
+function drawStars() {
+  if (!Array.isArray(STARS)) return;
+  for (const s of STARS) {
+    if (s.collected) continue;
+    if (starLoaded && starImage) {
+      ctx.drawImage(starImage, s.x, s.y, s.w, s.h);
+    } else {
+      ctx.fillStyle = '#ffd166';
+      ctx.beginPath();
+      const cx = s.x + s.w / 2;
+      const cy = s.y + s.h / 2;
+      const r = Math.min(s.w, s.h) / 2;
+      ctx.moveTo(cx + r, cy);
+      for (let i = 1; i <= 5; i++) {
+        const a = (i * 2 * Math.PI) / 5;
+        ctx.lineTo(cx + Math.cos(a) * r * 0.5, cy + Math.sin(a) * r * 0.5);
+        const b = ((i + 0.5) * 2 * Math.PI) / 5;
+        ctx.lineTo(cx + Math.cos(b) * r, cy + Math.sin(b) * r);
+      }
+      ctx.fill();
+    }
   }
 }
 

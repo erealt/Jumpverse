@@ -34,6 +34,8 @@ const ASSETS = {
 ASSETS.JUMP = '/assets/salto.ogg';
 // Slime enemy sprite
 ASSETS.SLIME = '/assets/slimeBlock.png';
+// Star collectible
+ASSETS.STAR = '/assets/star.svg';
 
 const BACKGROUND_SETTINGS = {
   SCALE: 2.2,
@@ -111,3 +113,18 @@ const SLIMES = [
 
 // Multiplier for slime patrol speed
 CONFIG.SLIME_SPEED_MULTIPLIER = 1.0;
+
+// Collectible stars: we'll place 10 across the world at varied heights
+const STARS = (() => {
+  const stars = [];
+  const count = 10;
+  // Scatter across the WORLD_WIDTH and in vertical bands up the WORLD_HEIGHT
+  for (let i = 0; i < count; i++) {
+    const t = i / (count - 1); // 0..1
+    const x = 40 + Math.round(t * (CONFIG.WORLD_WIDTH - 80));
+    // distribute Y from near ground up towards top with some jitter
+    const y = Math.round(CONFIG.WORLD_HEIGHT - 140 - t * (CONFIG.WORLD_HEIGHT - 300) + (Math.random() * 40 - 20));
+    stars.push({ x, y, w: 20, h: 20, collected: false });
+  }
+  return stars;
+})();
