@@ -822,7 +822,21 @@ function applySelectionAndStart(selection) {
 
 // Hook menu UI
 document.addEventListener('DOMContentLoaded', () => {
-  const overlay = document.getElementById('menuOverlay');
+  // Show 'How to play' overlay first
+  const howToPlay = document.getElementById('howToPlayOverlay');
+  const menuOverlay = document.getElementById('menuOverlay');
+  if (howToPlay) {
+    howToPlay.style.display = 'flex';
+    menuOverlay.style.display = 'none';
+    const startBtn = document.getElementById('startGameBtn');
+    if (startBtn) {
+      startBtn.addEventListener('click', () => {
+        howToPlay.style.display = 'none';
+        menuOverlay.style.display = 'flex';
+      });
+    }
+  }
+
   const choices = Array.from(document.querySelectorAll('.choice'));
   let current = choices[0];
   current.classList.add('selected');
@@ -846,7 +860,7 @@ document.addEventListener('DOMContentLoaded', () => {
       selection = { type: 'color', color };
     }
     // Hide menu and show transition overlay briefly
-    overlay.style.display = 'none';
+    menuOverlay.style.display = 'none';
     const trans = document.getElementById('transitionOverlay');
     if (trans) {
       trans.style.display = 'flex';

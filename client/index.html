@@ -3,35 +3,156 @@
 <head>
     <title>Jumpverse Platformer</title>
     <style>
-        body { margin: 0; overflow: hidden; background-color: black; }
-        canvas { display: block; margin: auto; background-color: #333; }
-        /* Selection overlay */
-        #menuOverlay {
-            position: absolute;
-            left: 0; right: 0; top: 0; bottom: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: rgba(0,0,0,0.6);
-            z-index: 30;
-            color: #fff;
-            font-family: sans-serif;
-        }
-        #menu {
-            background: #222;
-            padding: 20px;
-            border-radius: 8px;
-            width: 520px;
-            box-shadow: 0 6px 20px rgba(0,0,0,0.6);
-        }
-        .choice { display: inline-block; width: 140px; margin: 8px; text-align: center; cursor: pointer; }
-        .choice img { width: 96px; height: 96px; display: block; margin: 0 auto 6px; border-radius: 8px; }
-        .choice.selected { outline: 3px solid #ffd166; border-radius: 8px; }
-        #playBtn { margin-top: 12px; padding: 8px 16px; background:#06d6a0; color:#012; border:none; border-radius:6px; cursor:pointer; font-weight:bold; }
+            body {
+                margin: 0; overflow: hidden; background: linear-gradient(120deg, #f8fafc 0%, #e0eafc 100%);
+                font-family: 'Nunito', 'Segoe UI', sans-serif;
+            }
+            canvas {
+                display: block; margin: auto; background-color: #333; box-shadow: 0 4px 32px rgba(0,0,0,0.18);
+                border-radius: 18px;
+            }
+            #howToPlayOverlay {
+                /* overlay styles improved below */
+            }
+            #menuOverlay {
+                position: absolute;
+                left: 0; right: 0; top: 0; bottom: 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background: rgba(0,0,0,0.55);
+                z-index: 30;
+                color: #fff;
+                font-family: inherit;
+            }
+            #menu {
+                background: #fff;
+                padding: 28px 24px 22px 24px;
+                border-radius: 16px;
+                width: 520px;
+                box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+                color: #222;
+            }
+            .choice {
+                display: inline-block;
+                width: 140px;
+                margin: 8px;
+                text-align: center;
+                cursor: pointer;
+                background: #f6f8ff;
+                border-radius: 12px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+                transition: box-shadow 0.2s, transform 0.2s;
+            }
+            .choice:hover {
+                box-shadow: 0 4px 16px rgba(0,0,0,0.13);
+                transform: translateY(-2px) scale(1.04);
+            }
+            .choice img {
+                width: 96px; height: 96px; display: block; margin: 0 auto 6px; border-radius: 12px; background: #e0eafc;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            }
+            .choice.selected {
+                outline: 3px solid #ffd166;
+                border-radius: 12px;
+                background: #fffbe6;
+                box-shadow: 0 4px 16px rgba(255,214,102,0.13);
+            }
+            #playBtn {
+                margin-top: 12px;
+                padding: 12px 28px;
+                background: linear-gradient(90deg, #ffd166 0%, #f9c74f 100%);
+                color: #222;
+                border: none;
+                border-radius: 8px;
+                cursor: pointer;
+                font-weight: bold;
+                font-size: 20px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.09);
+                transition: background 0.2s, transform 0.2s;
+            }
+            #playBtn:hover {
+                background: linear-gradient(90deg, #f9c74f 0%, #ffd166 100%);
+                transform: scale(1.06);
+            }
+            #howToPlayOverlay {
+                position: absolute; left:0;right:0;top:0;bottom:0;
+                display: flex; align-items: center; justify-content: center;
+                background: rgba(0,0,0,0.92); z-index:100; color:#fff;
+                font-family: inherit;
+            }
+            #howToPlayOverlay > div {
+                background: linear-gradient(120deg, #fffbe6 0%, #e0eafc 100%);
+                padding: 38px 32px;
+                border-radius: 18px;
+                box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+                max-width: 480px;
+                text-align: center;
+                color: #222;
+            }
+            #howToPlayOverlay h2 {
+                margin-bottom: 18px;
+                font-size: 2.1em;
+                color: #6c63ff;
+            }
+            #howToPlayOverlay ul {
+                text-align: left;
+                font-size: 18px;
+                margin-bottom: 22px;
+                line-height: 1.6;
+                padding-left: 0;
+                list-style: none;
+            }
+            #howToPlayOverlay ul li {
+                margin-bottom: 10px;
+                position: relative;
+                padding-left: 32px;
+            }
+            #howToPlayOverlay ul li:before {
+                content: '★';
+                position: absolute;
+                left: 0; top: 0;
+                color: #ffd166;
+                font-size: 1.2em;
+            }
+            #startGameBtn {
+                padding: 16px 38px;
+                font-size: 22px;
+                border-radius: 10px;
+                background: linear-gradient(90deg, #6c63ff 0%, #ffd166 100%);
+                color: #fff;
+                border: none;
+                cursor: pointer;
+                font-weight: bold;
+                box-shadow: 0 2px 12px rgba(0,0,0,0.10);
+                margin-top: 10px;
+                transition: background 0.2s, transform 0.2s;
+            }
+            #startGameBtn:hover {
+                background: linear-gradient(90deg, #ffd166 0%, #6c63ff 100%);
+                transform: scale(1.07);
+            }
     </style>
 </head>
 <body>
-    <canvas id="game" width="1280" height="720" style="max-width:100%; height:auto;"></canvas>
+
+        <canvas id="game" width="1280" height="720" style="max-width:100%; height:auto;"></canvas>
+
+        <!-- How to play overlay -->
+        <div id="howToPlayOverlay">
+            <div>
+                <h2>¿Cómo jugar?</h2>
+                <ul>
+                    <li>Mueve el personaje con <b>A/D</b> o <b>←/→</b></li>
+                    <li>Salta con <b>W</b>, <b>↑</b> o <b>Espacio</b></li>
+                    <li>Recoge <b>10 estrellas</b> repartidas por el mapa</li>
+                    <li>Evita los slimes y no caigas fuera del mundo</li>
+                    <li>Tienes <b>5 vidas</b>. Al perderlas, puedes reiniciar</li>
+                    <li>¡Elige tu personaje y supera el reto!</li>
+                </ul>
+                <button id="startGameBtn">A JUGAR</button>
+            </div>
+        </div>
 
         <div id="menuOverlay">
             <div id="menu">
