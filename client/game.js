@@ -705,11 +705,13 @@ function updateStars() {
 
 function checkPlayerStarCollisions() {
   if (!Array.isArray(STARS)) return;
+  let collectedNow = false;
   for (const s of STARS) {
     if (s.collected) continue;
     const collided = player.x < s.x + s.w && player.x + player.w > s.x && player.y < s.y + s.h && player.y + player.h > s.y;
     if (!collided) continue;
     s.collected = true;
+    collectedNow = true;
     // play star pickup sound
     try {
       if (starBuffer && audioCtx && starGain) {
@@ -725,6 +727,12 @@ function checkPlayerStarCollisions() {
     } catch (e) {
       console.warn('play star sound error', e);
     }
+  }
+  // Si todas las estrellas están recogidas, mostrar overlay de victoria
+  if (STARS.every(s => s.collected)) {
+    gameOver = true;
+    const overlay = document.getElementById('victoryOverlay');
+    if (overlay) overlay.style.display = 'flex';
   }
 }
 
@@ -883,6 +891,23 @@ document.addEventListener('DOMContentLoaded', () => {
     player.invulnerableUntil = 0;
     player.flashUntil = 0;
     respawnPlayer();
+    // Reset estrellas
+    for (const s of STARS) s.collected = false;
+    gameOver = false;
+  });
+
+  // Restart button for Victory
+  const restartWinBtn = document.getElementById('restartWinBtn');
+  if (restartWinBtn) restartWinBtn.addEventListener('click', () => {
+    const overlay = document.getElementById('victoryOverlay');
+    if (overlay) overlay.style.display = 'none';
+    // reset game state
+    player.lives = 5;
+    player.invulnerableUntil = 0;
+    player.flashUntil = 0;
+    respawnPlayer();
+    // Reset estrellas
+    for (const s of STARS) s.collected = false;
     gameOver = false;
   });
 });

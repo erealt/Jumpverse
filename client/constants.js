@@ -118,17 +118,20 @@ const SLIMES = [
 // Multiplier for slime patrol speed
 CONFIG.SLIME_SPEED_MULTIPLIER = 1.0;
 
-// Collectible stars: we'll place 10 across the world at varied heights
+// Collectible stars: place 10, each above a platform for guaranteed accessibility
 const STARS = (() => {
   const stars = [];
   const count = 10;
-  // Scatter across the WORLD_WIDTH and in vertical bands up the WORLD_HEIGHT
+  // Use platforms (skip ground) to place stars above them
+  const validPlatforms = PLATFORMS.filter(p => p.y < CONFIG.WORLD_HEIGHT - 80);
   for (let i = 0; i < count; i++) {
-    const t = i / (count - 1); // 0..1
-    const x = 40 + Math.round(t * (CONFIG.WORLD_WIDTH - 80));
-    // distribute Y from near ground up towards top with some jitter
-    const y = Math.round(CONFIG.WORLD_HEIGHT - 140 - t * (CONFIG.WORLD_HEIGHT - 300) + (Math.random() * 40 - 20));
-    stars.push({ x, y, w: 20, h: 20, collected: false });
+    const plat = validPlatforms[Math.floor(i * validPlatforms.length / count)];
+    if (plat) {
+      // Center star above platform, slightly above
+      const x = Math.round(plat.x + plat.w / 2 - 10);
+      const y = Math.round(plat.y - 28); // 28px above platform
+      stars.push({ x, y, w: 20, h: 20, collected: false });
+    }
   }
   return stars;
 })();
